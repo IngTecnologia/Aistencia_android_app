@@ -81,16 +81,6 @@ La aplicación puede personalizarse con:
 
 ---
 
-## 👤 Desarrollado por
-
-**INEMEC - Soluciones Tecnológicas Empresariales**
-
-Desarrollo liderado por **Ing. Jesús Cotes**
-
-[![GitHub](https://img.shields.io/badge/GitHub-@IngTecnologia-black?logo=github)](https://github.com/IngTecnologia)
-
----
-
 ## ⚙️ Instalación para desarrollo
 
 ```bash
