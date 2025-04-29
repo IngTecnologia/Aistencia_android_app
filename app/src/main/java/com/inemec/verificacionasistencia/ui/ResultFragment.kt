@@ -52,6 +52,27 @@ class ResultFragment : Fragment() {
                 binding.resultCedulaTextView.text = args.getString("cedula", "")
                 binding.resultTipoTextView.text = formatTipoRegistro(args.getString("tipoRegistro", ""))
                 binding.resultTimestampTextView.text = formatTimestamp(args.getString("timestamp", ""))
+
+                // Información de ubicación
+                val fueraUbicacion = args.getBoolean("fueraUbicacion", false)
+                val ubicacion = args.getString("ubicacion", "Principal")
+
+                if (fueraUbicacion) {
+                    binding.resultUbicacionTextView.text = "$ubicacion (Fuera de ubicación)"
+                    binding.resultUbicacionTextView.setTextColor(resources.getColor(R.color.warning_color, null))
+                } else {
+                    binding.resultUbicacionTextView.text = ubicacion
+                    binding.resultUbicacionTextView.setTextColor(binding.resultCedulaTextView.currentTextColor)
+                }
+
+                // Comentario si existe
+                val comentario = args.getString("comentario", "")
+                if (fueraUbicacion && comentario.isNotBlank()) {
+                    binding.comentarioLayout.visibility = View.VISIBLE
+                    binding.resultComentarioTextView.text = comentario
+                } else {
+                    binding.comentarioLayout.visibility = View.GONE
+                }
             } else {
                 // Mostrar error
                 binding.errorLayout.visibility = View.VISIBLE

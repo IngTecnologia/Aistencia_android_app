@@ -34,6 +34,8 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import android.widget.EditText
+import androidx.appcompat.app.AlertDialog
 
 class CameraFragment : Fragment() {
 
@@ -194,6 +196,16 @@ class CameraFragment : Fragment() {
     private fun sendPhoto() {
         val file = photoFile ?: return
 
+        // Verificar si se requiere comentario
+        val fueraUbicacion = UserData.fueraUbicacion
+        val requiereComentario = UserData.requiereComentario
+
+        if (fueraUbicacion && requiereComentario && (UserData.comentario.isNullOrBlank())) {
+            // Mostrar diálogo para solicitar comentario
+            showCommentDialog()
+            return
+        }
+
         // Create multipart request
         val requestFile = file.asRequestBody("image/jpeg".toMediaTypeOrNull())
         val imagePart = MultipartBody.Part.createFormData("image", file.name, requestFile)
@@ -202,7 +214,9 @@ class CameraFragment : Fragment() {
         val call = ApiClient.apiService.verifyFace(
             UserData.cedula,
             UserData.sessionToken,
-            imagePart
+            imagePart,
+            UserData.fueraUbicacion,
+            UserData.comentario
         )
 
         // Show progress
@@ -223,6 +237,9 @@ class CameraFragment : Fragment() {
                         putString("tipoRegistro", verifyResponse.tipo_registro)
                         putString("timestamp", verifyResponse.timestamp)
                         putString("recordId", verifyResponse.record_id)
+                        putBoolean("fueraUbicacion", verifyResponse.fuera_de_ubicacion)
+                        putString("comentario", verifyResponse.comentario)
+                        putString("ubicacion", verifyResponse.ubicacion_nombre)
                         putString("errorMessage", if (!verifyResponse.verified) "Verificación facial fallida" else null)
                     }
 
@@ -253,6 +270,31 @@ class CameraFragment : Fragment() {
             }
         })
         Log.d("TokenDebug", "Enviando token: ${UserData.sessionToken}")
+    }
+
+    private fun showCommentDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_comment, null)
+        val commentEditText = dialogView.findViewById<EditText>(R.id.commentEditText)
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("Comentario requerido")
+            .setMessage("Estás fuera de tu ubicación asignada. Por favor, proporciona un comentario para este registro.")
+            .setView(dialogView)
+            .setPositiveButton("Enviar") { dialog, _ ->
+                val comentario = commentEditText.text.toString()
+                if (comentario.isBlank()) {
+                    Toast.makeText(requireContext(), "El comentario es obligatorio", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                UserData.comentario = comentario
+                dialog.dismiss()
+                sendPhoto()
+            }
+            .setNegativeButton("Cancelar") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .setCancelable(false)
+            .show()
     }
 
     override fun onDestroyView() {

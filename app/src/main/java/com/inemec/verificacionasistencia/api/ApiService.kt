@@ -25,6 +25,8 @@ interface ApiService {
     fun verifyFace(
         @Part("cedula") cedula: String,
         @Part("session_token") sessionToken: String,
-        @Part image: MultipartBody.Part
+        @Part image: MultipartBody.Part,
+        @Part("fuera_de_ubicacion") fueraUbicacion: Boolean,
+        @Part("comentario") comentario: String?
     ): Call<VerifyResponse>
 }

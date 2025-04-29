@@ -147,9 +147,22 @@ class LocationFragment : Fragment() {
                     if (initResponse != null && initResponse.valid) {
                         // Ubicación válida
                         UserData.sessionToken = initResponse.session_token ?: ""
+                        UserData.fueraUbicacion = initResponse.fuera_de_ubicacion
+                        UserData.requiereComentario = initResponse.requiere_comentario
+                        UserData.ubicacionActual = initResponse.ubicacion_actual
+                        UserData.distancia = initResponse.distancia
+                        UserData.comentario = null // Resetear comentario
 
                         binding.locationStatusTextView.text = "¡Hola ${initResponse.nombre}! Ubicación verificada."
                         binding.locationErrorTextView.visibility = View.GONE
+
+                        // Si está fuera de ubicación pero es válido (perfil movil o libre), mostrar aviso
+                        if (initResponse.fuera_de_ubicacion) {
+                            binding.locationWarningTextView.visibility = View.VISIBLE
+                            binding.locationWarningTextView.text = "Nota: Estás a ${initResponse.distancia}m de tu ubicación '${initResponse.ubicacion_actual ?: "Principal"}'"
+                        } else {
+                            binding.locationWarningTextView.visibility = View.GONE
+                        }
 
                         // Esperar 2 segundos y navegar a la cámara
                         binding.root.postDelayed({
@@ -162,6 +175,7 @@ class LocationFragment : Fragment() {
                 } else {
                     showLocationError("Error en la verificación: ${response.message()}")
                 }
+
             }
 
             override fun onFailure(call: Call<InitResponse>, t: Throwable) {
