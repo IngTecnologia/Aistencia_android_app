@@ -85,7 +85,7 @@ La aplicación puede personalizarse con:
 
 ```bash
 # Clonar el repositorio
-git clone https://github.com/IngTecnologia/NombreDelRepositorio.git
+git clone https://github.com/IngTecnologia/Asistencia_android_app.git
 
 # Abrir el proyecto en Android Studio
 
