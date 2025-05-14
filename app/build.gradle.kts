@@ -13,7 +13,7 @@ android {
         minSdk = 21
         targetSdk = 35
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.0"  // Cambié "1.0" a "1.0.0" para consistencia
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -81,7 +81,7 @@ dependencies {
     implementation("androidx.camera:camera-view:1.1.0")
 
     // Para la ubicación
-    implementation ("com.google.android.gms:play-services-location:21.0.1")
+    implementation("com.google.android.gms:play-services-location:21.0.1")
 
     // Para pruebas
     testImplementation("junit:junit:4.13.2")

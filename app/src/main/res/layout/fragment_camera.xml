@@ -2,82 +2,124 @@
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="#000000">
 
     <TextView
         android:id="@+id/cameraTitleTextView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
         android:text="Verificación Facial"
         android:textSize="24sp"
         android:textStyle="bold"
+        android:textColor="#FFFFFF"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent"
+        android:layout_marginTop="16dp" />
 
     <TextView
         android:id="@+id/cameraInstructionsTextView"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginHorizontal="16dp"
-        android:layout_marginTop="8dp"
-        android:text="Por favor, coloca tu rostro en el centro de la cámara."
+        android:text="Alinee su rostro con el óvalo y presione capturar"
         android:textAlignment="center"
-        app:layout_constraintTop_toBottomOf="@id/cameraTitleTextView" />
+        android:textColor="#FFFFFF"
+        android:layout_marginTop="8dp"
+        app:layout_constraintTop_toBottomOf="@id/cameraTitleTextView"
+        android:layout_marginHorizontal="16dp" />
 
+    <!-- Vista previa de la cámara (base) -->
     <androidx.camera.view.PreviewView
         android:id="@+id/cameraPreviewView"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginHorizontal="16dp"
-        android:layout_marginTop="16dp"
-        android:layout_marginBottom="16dp"
+        app:layout_constraintTop_toBottomOf="@id/cameraInstructionsTextView"
         app:layout_constraintBottom_toTopOf="@id/captureButton"
-        app:layout_constraintTop_toBottomOf="@id/cameraInstructionsTextView" />
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="16dp" />
 
+    <!-- Overlay con guía elíptica (debe cubrir TODA la pantalla) -->
+    <com.inemec.verificacionasistencia.ui.FaceGuideOverlay
+        android:id="@+id/faceGuideOverlay"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Pantalla de procesamiento (superpuesta) -->
+    <LinearLayout
+        android:id="@+id/processingLayout"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:background="#F5F5F5"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="@id/cameraPreviewView"
+        app:layout_constraintBottom_toBottomOf="@id/cameraPreviewView"
+        app:layout_constraintStart_toStartOf="@id/cameraPreviewView"
+        app:layout_constraintEnd_toEndOf="@id/cameraPreviewView">
+
+        <ProgressBar
+            android:id="@+id/processingProgressBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:id="@+id/processingTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Procesando..."
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="#333333" />
+
+    </LinearLayout>
+
+    <!-- ImageView oculto (ya no se usa para mostrar) -->
     <ImageView
         android:id="@+id/capturedImageView"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_marginHorizontal="16dp"
-        android:layout_marginTop="16dp"
-        android:layout_marginBottom="16dp"
-        android:scaleType="centerCrop"
+        android:layout_height="match_parent"
         android:visibility="gone"
-        app:layout_constraintBottom_toTopOf="@id/captureButton"
-        app:layout_constraintTop_toBottomOf="@id/cameraInstructionsTextView" />
+        android:scaleType="centerCrop" />
 
     <Button
         android:id="@+id/captureButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"
         android:text="Capturar Foto"
+        android:layout_marginBottom="16dp"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
     <Button
         android:id="@+id/retakeButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"
         android:text="Tomar Otra"
         android:visibility="gone"
+        android:layout_marginBottom="16dp"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toStartOf="@id/sendButton"
-        app:layout_constraintStart_toStartOf="parent" />
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/sendButton" />
 
     <Button
         android:id="@+id/sendButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"
         android:text="Enviar"
         android:visibility="gone"
+        android:layout_marginBottom="16dp"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@id/retakeButton" />
+        app:layout_constraintStart_toEndOf="@id/retakeButton"
+        app:layout_constraintEnd_toEndOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

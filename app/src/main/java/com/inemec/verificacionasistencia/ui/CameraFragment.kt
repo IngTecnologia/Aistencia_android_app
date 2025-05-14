@@ -1,8 +1,10 @@
 package com.inemec.verificacionasistencia.ui
 
 import android.Manifest
-import android.content.ContentValues
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -30,12 +32,11 @@ import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
 import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import android.widget.EditText
-import androidx.appcompat.app.AlertDialog
 
 class CameraFragment : Fragment() {
 
@@ -95,31 +96,48 @@ class CameraFragment : Fragment() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
 
         cameraProviderFuture.addListener({
-            // Used to bind the lifecycle of cameras to the lifecycle owner
             val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
 
-            // Preview
+            // Preview con configuración de zoom (crop) para mostrar solo el área del óvalo
             val preview = Preview.Builder()
                 .build()
-                .also {
-                    it.setSurfaceProvider(binding.cameraPreviewView.surfaceProvider)
+                .also { preview ->
+                    preview.setSurfaceProvider { surfaceRequest ->
+                        // Configurar el surface provider con transformación para hacer zoom
+                        val surfaceProvider = binding.cameraPreviewView.surfaceProvider
+                        surfaceProvider?.let { provider ->
+                            provider.onSurfaceRequested(surfaceRequest)
+
+                            // Aplicar zoom digital a la vista previa
+                            // Este zoom solo afecta lo que VE el usuario, no la captura
+                            binding.cameraPreviewView.scaleType = androidx.camera.view.PreviewView.ScaleType.FILL_CENTER
+
+                            // Configurar el zoom en la vista previa después de que esté lista
+                            binding.cameraPreviewView.post {
+                                applyPreviewZoom()
+                            }
+                        }
+                    }
                 }
 
             // Select front camera as a default
             val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
 
-            // Image capture
+            // Image capture - SIN ZOOM, resolución completa para DeepFace
             imageCapture = ImageCapture.Builder()
+                .setTargetResolution(android.util.Size(1280, 960))
                 .build()
 
             try {
-                // Unbind use cases before rebinding
                 cameraProvider.unbindAll()
 
-                // Bind use cases to camera
-                cameraProvider.bindToLifecycle(
+                // Bind solo preview e imageCapture
+                val camera = cameraProvider.bindToLifecycle(
                     viewLifecycleOwner, cameraSelector, preview, imageCapture
                 )
+
+                // Obtener control de la cámara para configuraciones adicionales si es necesario
+                val cameraControl = camera.cameraControl
 
             } catch (e: Exception) {
                 Log.e(TAG, "Use case binding failed", e)
@@ -128,11 +146,20 @@ class CameraFragment : Fragment() {
         }, ContextCompat.getMainExecutor(requireContext()))
     }
 
+    private fun applyPreviewZoom() {
+        // Aplicar zoom digital más moderado a la vista previa
+        // Reducido de 2.0x a 1.5x para mayor comodidad
+        binding.cameraPreviewView.scaleX = 1.5f  // Zoom de 1.5x (reducido)
+        binding.cameraPreviewView.scaleY = 1.5f  // Zoom de 1.5x (reducido)
+
+        // Opcional: Ajustar la posición si es necesario
+        binding.cameraPreviewView.translationX = 0f
+        binding.cameraPreviewView.translationY = 0f
+    }
+
     private fun takePhoto() {
-        // Get a stable reference of the modifiable image capture use case
         val imageCapture = imageCapture ?: return
 
-        // Create temporary file
         val photoFile = File(
             requireContext().cacheDir,
             SimpleDateFormat(
@@ -141,17 +168,16 @@ class CameraFragment : Fragment() {
             ).format(System.currentTimeMillis()) + ".jpg"
         )
 
-        // Create output options object which contains file + metadata
         val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
 
-        // Set up image capture listener
+        // La imagen se captura SIN ZOOM, tamaño completo
         imageCapture.takePicture(
             outputOptions,
             ContextCompat.getMainExecutor(requireContext()),
             object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                     this@CameraFragment.photoFile = photoFile
-                    showCapturedPhoto(photoFile)
+                    showProcessingScreen() // Mostrar pantalla de procesamiento en lugar de la imagen
                 }
 
                 override fun onError(exc: ImageCaptureException) {
@@ -166,144 +192,157 @@ class CameraFragment : Fragment() {
         )
     }
 
-    private fun showCapturedPhoto(photoFile: File) {
-        // Hide preview and show captured image
+    private fun showProcessingScreen() {
+        // Ocultar vista previa y overlay, mostrar pantalla de procesamiento
         binding.cameraPreviewView.visibility = View.GONE
-        binding.capturedImageView.visibility = View.VISIBLE
-        binding.capturedImageView.setImageURI(android.net.Uri.fromFile(photoFile))
+        binding.faceGuideOverlay.visibility = View.GONE
+        binding.capturedImageView.visibility = View.GONE
 
-        // Update buttons
+        // Mostrar layout de procesamiento completo
+        binding.processingLayout.visibility = View.VISIBLE
+        binding.processingTextView.text = "Procesando imagen facial..."
+
+        // Ocultar botones de captura, mostrar botón de reintento
         binding.captureButton.visibility = View.GONE
         binding.retakeButton.visibility = View.VISIBLE
-        binding.sendButton.visibility = View.VISIBLE
+        binding.sendButton.visibility = View.GONE
+
+        // Automáticamente procesar y enviar la imagen
+        sendPhoto()
     }
 
     private fun setupForNewPhoto() {
-        // Show preview and hide captured image
+        // Volver a la vista previa con zoom
         binding.cameraPreviewView.visibility = View.VISIBLE
+        binding.faceGuideOverlay.visibility = View.VISIBLE
         binding.capturedImageView.visibility = View.GONE
 
-        // Update buttons
+        // Ocultar layout de procesamiento
+        binding.processingLayout.visibility = View.GONE
+
+        // Reaplicar el zoom a la vista previa
+        applyPreviewZoom()
+
         binding.captureButton.visibility = View.VISIBLE
         binding.retakeButton.visibility = View.GONE
         binding.sendButton.visibility = View.GONE
 
-        // Delete the previous photo file
         photoFile?.delete()
         photoFile = null
+    }
+
+    private fun processImageForSending(originalFile: File): File {
+        val bitmap = BitmapFactory.decodeFile(originalFile.absolutePath) ?: return originalFile
+
+        // Aplicar compresión básica para optimizar el envío
+        val ratio = minOf(
+            MAX_IMAGE_WIDTH.toFloat() / bitmap.width,
+            MAX_IMAGE_HEIGHT.toFloat() / bitmap.height
+        )
+
+        val newWidth = (bitmap.width * ratio).toInt()
+        val newHeight = (bitmap.height * ratio).toInt()
+        val resizedBitmap = Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+
+        // CORRECCIÓN DE ROTACIÓN para cámara frontal
+        val matrix = Matrix()
+        // Para cámara frontal: 90 grados en lugar de 270
+        matrix.postRotate(0f) // Cambiado de 270f a 90f
+        matrix.postScale(-1f, 1f) // Voltear horizontalmente para cámara frontal
+        val finalBitmap = Bitmap.createBitmap(
+            resizedBitmap, 0, 0, resizedBitmap.width, resizedBitmap.height, matrix, true
+        )
+
+        // Guardar imagen procesada
+        val processedFile = File(
+            requireContext().cacheDir,
+            "verification_${System.currentTimeMillis()}.jpg"
+        )
+
+        try {
+            FileOutputStream(processedFile).use { out ->
+                finalBitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)
+            }
+
+            bitmap.recycle()
+            resizedBitmap.recycle()
+            finalBitmap.recycle()
+
+            Log.d(TAG, "Imagen procesada: ${originalFile.length()} -> ${processedFile.length()} bytes")
+            return processedFile
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al procesar imagen", e)
+            return originalFile
+        }
     }
 
     private fun sendPhoto() {
         val file = photoFile ?: return
 
-        // Verificar si se requiere comentario
-        val fueraUbicacion = UserData.fueraUbicacion
-        val requiereComentario = UserData.requiereComentario
+        // Actualizar texto de procesamiento
+        binding.processingTextView.text = "Enviando para verificación..."
 
-        if (fueraUbicacion && requiereComentario && (UserData.comentario.isNullOrBlank())) {
-            // Mostrar diálogo para solicitar comentario
-            showCommentDialog()
-            return
-        }
+        // Procesar la imagen (solo compresión y rotación, la imagen completa)
+        val processedFile = processImageForSending(file)
 
-        // Create multipart request
-        val requestFile = file.asRequestBody("image/jpeg".toMediaTypeOrNull())
-        val imagePart = MultipartBody.Part.createFormData("image", file.name, requestFile)
+        val requestFile = processedFile.asRequestBody("image/jpeg".toMediaTypeOrNull())
+        val imagePart = MultipartBody.Part.createFormData("image", processedFile.name, requestFile)
 
-        // Call API
         val call = ApiClient.apiService.verifyFace(
             UserData.cedula,
             UserData.sessionToken,
-            imagePart,
-            UserData.fueraUbicacion,
-            UserData.comentario
+            imagePart
         )
-
-        // Show progress
-        Toast.makeText(requireContext(), "Enviando verificación...", Toast.LENGTH_SHORT).show()
-        binding.sendButton.isEnabled = false
 
         call.enqueue(object : Callback<VerifyResponse> {
             override fun onResponse(call: Call<VerifyResponse>, response: Response<VerifyResponse>) {
-                binding.sendButton.isEnabled = true
-
                 if (response.isSuccessful && response.body() != null) {
                     val verifyResponse = response.body()!!
 
-                    // Store in bundle to pass to result fragment
                     val bundle = Bundle().apply {
                         putBoolean("verified", verifyResponse.verified)
                         putString("cedula", verifyResponse.cedula)
                         putString("tipoRegistro", verifyResponse.tipo_registro)
                         putString("timestamp", verifyResponse.timestamp)
                         putString("recordId", verifyResponse.record_id)
-                        putBoolean("fueraUbicacion", verifyResponse.fuera_de_ubicacion)
-                        putString("comentario", verifyResponse.comentario)
-                        putString("ubicacion", verifyResponse.ubicacion_nombre)
                         putString("errorMessage", if (!verifyResponse.verified) "Verificación facial fallida" else null)
                     }
 
-                    // Navigate to result fragment
                     findNavController().navigate(R.id.action_cameraFragment_to_resultFragment, bundle)
                 } else {
-                    // Handle API error
                     val errorMessage = response.errorBody()?.string() ?: "Error desconocido"
-
                     val bundle = Bundle().apply {
                         putBoolean("verified", false)
                         putString("errorMessage", "Error en la verificación: $errorMessage")
                     }
-
                     findNavController().navigate(R.id.action_cameraFragment_to_resultFragment, bundle)
                 }
+
+                processedFile.delete()
             }
 
             override fun onFailure(call: Call<VerifyResponse>, t: Throwable) {
-                binding.sendButton.isEnabled = true
-
                 val bundle = Bundle().apply {
                     putBoolean("verified", false)
                     putString("errorMessage", "Error de conexión: ${t.message}")
                 }
-
                 findNavController().navigate(R.id.action_cameraFragment_to_resultFragment, bundle)
+                processedFile.delete()
             }
         })
-        Log.d("TokenDebug", "Enviando token: ${UserData.sessionToken}")
-    }
-
-    private fun showCommentDialog() {
-        val dialogView = layoutInflater.inflate(R.layout.dialog_comment, null)
-        val commentEditText = dialogView.findViewById<EditText>(R.id.commentEditText)
-
-        AlertDialog.Builder(requireContext())
-            .setTitle("Comentario requerido")
-            .setMessage("Estás fuera de tu ubicación asignada. Por favor, proporciona un comentario para este registro.")
-            .setView(dialogView)
-            .setPositiveButton("Enviar") { dialog, _ ->
-                val comentario = commentEditText.text.toString()
-                if (comentario.isBlank()) {
-                    Toast.makeText(requireContext(), "El comentario es obligatorio", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
-                }
-                UserData.comentario = comentario
-                dialog.dismiss()
-                sendPhoto()
-            }
-            .setNegativeButton("Cancelar") { dialog, _ ->
-                dialog.dismiss()
-            }
-            .setCancelable(false)
-            .show()
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
         cameraExecutor.shutdown()
+        photoFile?.delete()
         _binding = null
     }
 
     companion object {
         private const val TAG = "CameraFragment"
+        private const val MAX_IMAGE_WIDTH = 640
+        private const val MAX_IMAGE_HEIGHT = 640
+        private const val JPEG_QUALITY = 75
     }
 }
