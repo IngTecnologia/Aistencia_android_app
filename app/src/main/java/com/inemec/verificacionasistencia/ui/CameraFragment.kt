@@ -247,7 +247,7 @@ class CameraFragment : Fragment() {
         // CORRECCIÓN DE ROTACIÓN para cámara frontal
         val matrix = Matrix()
         // Para cámara frontal: 90 grados en lugar de 270
-        matrix.postRotate(90f) // Cambiado de 270f a 90f
+        matrix.postRotate(0f) // Cambiado de 270f a 90f
         matrix.postScale(-1f, 1f) // Voltear horizontalmente para cámara frontal
         val finalBitmap = Bitmap.createBitmap(
             resizedBitmap, 0, 0, resizedBitmap.width, resizedBitmap.height, matrix, true
