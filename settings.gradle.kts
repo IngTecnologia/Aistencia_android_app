@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "verificacion_asistencia"
+rootProject.name = "BioEntry"
 include(":app")
