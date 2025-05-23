@@ -159,7 +159,16 @@ class LocationFragment : Fragment() {
                         // Si está fuera de ubicación pero es válido (perfil movil o libre), mostrar aviso
                         if (initResponse.fuera_de_ubicacion) {
                             binding.locationWarningTextView.visibility = View.VISIBLE
-                            binding.locationWarningTextView.text = "Nota: Estás a ${initResponse.distancia}m de tu ubicación '${initResponse.ubicacion_actual ?: "Principal"}'"
+
+                            // Mensaje diferenciado según si requiere comentario o no
+                            val distanceMessage = "Estás a ${initResponse.distancia}m de tu ubicación '${initResponse.ubicacion_actual ?: "Principal"}'"
+                            val commentMessage = if (initResponse.requiere_comentario) {
+                                "\n\nNota: Se te solicitará un comentario al registrar tu asistencia."
+                            } else {
+                                ""
+                            }
+
+                            binding.locationWarningTextView.text = distanceMessage + commentMessage
                         } else {
                             binding.locationWarningTextView.visibility = View.GONE
                         }

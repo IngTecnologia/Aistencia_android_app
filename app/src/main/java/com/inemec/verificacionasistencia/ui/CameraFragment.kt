@@ -25,9 +25,12 @@ import com.inemec.verificacionasistencia.api.ApiClient
 import com.inemec.verificacionasistencia.databinding.FragmentCameraBinding
 import com.inemec.verificacionasistencia.model.UserData
 import com.inemec.verificacionasistencia.model.VerifyResponse
+import com.inemec.verificacionasistencia.ui.dialogs.CommentDialog
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -279,6 +282,24 @@ class CameraFragment : Fragment() {
     private fun sendPhoto() {
         val file = photoFile ?: return
 
+        // Verificar si el usuario requiere comentario
+        if (UserData.requiereComentario && UserData.comentario == null) {
+            // Mostrar diálogo para obtener comentario
+            val commentDialog = CommentDialog { comment ->
+                UserData.comentario = comment
+                // Proceder con el envío después de obtener el comentario
+                performPhotoSend()
+            }
+            commentDialog.show(parentFragmentManager, "CommentDialog")
+        } else {
+            // Si no requiere comentario o ya lo tiene, enviar directamente
+            performPhotoSend()
+        }
+    }
+
+    private fun performPhotoSend() {
+        val file = photoFile ?: return
+
         // Actualizar texto de procesamiento
         binding.processingTextView.text = "Enviando para verificación..."
 
@@ -288,9 +309,20 @@ class CameraFragment : Fragment() {
         val requestFile = processedFile.asRequestBody("image/jpeg".toMediaTypeOrNull())
         val imagePart = MultipartBody.Part.createFormData("image", processedFile.name, requestFile)
 
-        val call = ApiClient.apiService.verifyFace(
-            UserData.cedula,
-            UserData.sessionToken,
+        // Crear el mapa de parámetros incluyendo todos los campos necesarios
+        val params = mutableMapOf<String, RequestBody>()
+        params["cedula"] = UserData.cedula.toRequestBody("text/plain".toMediaTypeOrNull())
+        params["session_token"] = UserData.sessionToken.toRequestBody("text/plain".toMediaTypeOrNull())
+        params["fuera_de_ubicacion"] = UserData.fueraUbicacion.toString().toRequestBody("text/plain".toMediaTypeOrNull())
+
+        // Agregar comentario si existe
+        if (UserData.comentario != null) {
+            params["comentario"] = UserData.comentario!!.toRequestBody("text/plain".toMediaTypeOrNull())
+        }
+
+        // Modificar la llamada para usar @PartMap
+        val call = ApiClient.apiService.verifyFaceWithComment(
+            params,
             imagePart
         )
 
@@ -305,6 +337,9 @@ class CameraFragment : Fragment() {
                         putString("tipoRegistro", verifyResponse.tipo_registro)
                         putString("timestamp", verifyResponse.timestamp)
                         putString("recordId", verifyResponse.record_id)
+                        putBoolean("fueraUbicacion", verifyResponse.fuera_de_ubicacion)
+                        putString("ubicacion", verifyResponse.ubicacion_nombre)
+                        putString("comentario", verifyResponse.comentario)
                         putString("errorMessage", if (!verifyResponse.verified) "Verificación facial fallida" else null)
                     }
 
