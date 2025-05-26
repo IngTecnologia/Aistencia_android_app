@@ -13,7 +13,7 @@ android {
         minSdk = 21
         targetSdk = 35
         versionCode = 1
-        versionName = "1.0.0"  // Cambié "1.0" a "1.0.0" para consistencia
+        versionName = "1.0.1"  // Cambié "1.0" a "1.0.0" para consistencia
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
